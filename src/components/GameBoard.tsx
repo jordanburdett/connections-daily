@@ -3,6 +3,8 @@ import { GameStatus } from '../types'
 import { TileButton } from './TileButton'
 import { CategoryBanner } from './CategoryBanner'
 import { LifeIndicators } from './LifeIndicators'
+import { OneAwayToast } from './OneAwayToast'
+import type { AudioEngine } from '../utils/AudioEngine'
 
 interface GameBoardProps {
   displayState: GameState
@@ -11,6 +13,9 @@ interface GameBoardProps {
   onSubmit: () => void
   onShuffle: () => void
   onDeselectAll: () => void
+  oneAway: boolean
+  challengeNumber: number
+  audio: AudioEngine
 }
 
 export function GameBoard({
@@ -20,6 +25,9 @@ export function GameBoard({
   onSubmit,
   onShuffle,
   onDeselectAll,
+  oneAway,
+  challengeNumber,
+  audio,
 }: GameBoardProps) {
   const { tiles, solvedGroups, livesRemaining, gameStatus } = displayState
   const unsolvedTiles = tiles.filter(t => !t.solved)
@@ -39,6 +47,11 @@ export function GameBoard({
         unsolvedCategoryMap.get(tile.categoryColor)!.words.push(tile.word)
       }
     }
+  }
+
+  function handleTileClick(word: string) {
+    audio.playTileClick()
+    onTileClick(word)
   }
 
   return (
@@ -83,14 +96,34 @@ export function GameBoard({
               word={tile.word}
               selected={tile.selected}
               shaking={shakingWords.has(tile.word)}
-              onClick={onTileClick}
+              onClick={handleTileClick}
             />
           ))}
         </div>
       )}
 
+      {/* One-away toast */}
+      <div style={{ textAlign: 'center' }}>
+        <OneAwayToast show={oneAway} />
+      </div>
+
+      {/* Guesses remaining label */}
+      {!isWon && !isLost && (
+        <p className="guesses-remaining">Guesses remaining: {livesRemaining}</p>
+      )}
+
       {/* Life indicators */}
       <LifeIndicators livesRemaining={livesRemaining} />
+
+      {/* Difficulty dots */}
+      <div className="difficulty-row">
+        <span>Difficulty:</span>
+        <span className="diff-dot diff-dot--yellow" aria-label="yellow" />
+        <span className="diff-dot diff-dot--green" aria-label="green" />
+        <span className="diff-dot diff-dot--blue" aria-label="blue" />
+        <span className="diff-dot diff-dot--purple" aria-label="purple" />
+        <span>#{challengeNumber}</span>
+      </div>
 
       {/* Action buttons */}
       {!isWon && !isLost && (
@@ -111,7 +144,7 @@ export function GameBoard({
             Deselect All
           </button>
           <button
-            className="btn-submit"
+            className={`btn-submit${selectedCount === 4 ? ' btn--ready' : ''}`}
             type="button"
             onClick={onSubmit}
             disabled={selectedCount !== 4}

@@ -11,8 +11,19 @@ export function TileButton({ word, selected, shaking, onClick }: TileButtonProps
     (selected ? ' tile--selected' : '') +
     (shaking ? ' tile--shake' : '')
 
+  function handleTouchStart(e: React.TouchEvent<HTMLButtonElement>) {
+    e.preventDefault()
+    onClick(word)
+  }
+
   return (
-    <button className={className} onClick={() => onClick(word)} type="button">
+    <button
+      className={className}
+      onClick={() => onClick(word)}
+      onTouchStart={handleTouchStart}
+      type="button"
+      style={{ WebkitTapHighlightColor: 'transparent' }}
+    >
       {word}
     </button>
   )

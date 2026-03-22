@@ -15,6 +15,7 @@ import {
 import { PUZZLES } from './data/puzzles'
 import type { PuzzleData, GameState } from './types'
 import { GameStatus } from './types'
+import { AudioEngine } from './utils/AudioEngine'
 
 type AppMode = 'daily' | 'practice'
 
@@ -60,6 +61,9 @@ function App() {
     return 'daily'
   })
 
+  // AudioEngine — lazy-initialized, stored in state (not ref)
+  const [audio] = useState(() => new AudioEngine())
+
   // Daily engine state
   const [dailyEngine, setDailyEngine] = useState<GameEngine>(() => {
     markAttemptStarted()
@@ -89,6 +93,7 @@ function App() {
   })
 
   const [shakingWords, setShakingWords] = useState<Set<string>>(new Set())
+  const [oneAway, setOneAway] = useState(false)
   const [dailyResult, setDailyResult] = useState<DailyResult | null>(() => {
     // If daily already completed today, restore result from saved state
     const saved = loadDailyState()
@@ -109,6 +114,7 @@ function App() {
   })
 
   const activeEngine = mode === 'daily' ? dailyEngine : practiceEngine
+  const challengeNumber = getChallengeNumber()
 
   function refreshDisplay(engine: GameEngine) {
     setDisplayState(engine.getState())
@@ -124,6 +130,7 @@ function App() {
     }
     setMode(newMode)
     setShakingWords(new Set())
+    setOneAway(false)
   }
 
   function handleTileClick(word: string) {
@@ -134,34 +141,60 @@ function App() {
   function handleSubmit() {
     const selectedWords = activeEngine.getSelectedWords()
     const result = activeEngine.submitGuess()
-    refreshDisplay(activeEngine)
+    const newState = activeEngine.getState()
+    setDisplayState(newState)
 
-    if (!result.correct && !result.alreadyGuessed) {
+    if (result.correct) {
+      audio.playCorrectGroup()
+      const isOver = newState.gameStatus === GameStatus.WON || newState.gameStatus === GameStatus.LOST
+      if (newState.gameStatus === GameStatus.WON) {
+        setTimeout(() => audio.playWinFanfare(), 300)
+      }
+      if (mode === 'daily' && isOver) {
+        const won = newState.gameStatus === GameStatus.WON
+        const cn = getChallengeNumber()
+        const emojiCard = buildEmojiCard(dailyPuzzle, newState.guessHistory, cn)
+        const solvedCount = newState.guessHistory.filter(g => g.correct).length
+        const streak = updateStreak(won)
+        saveDailyState({
+          played: true,
+          attemptStarted: true,
+          won,
+          guessHistory: newState.guessHistory,
+          livesRemaining: newState.livesRemaining,
+          challengeNumber: cn,
+        })
+        setDailyResult({ challengeNumber: cn, emojiCard, solvedCount, won, streak })
+      }
+    } else if (!result.alreadyGuessed) {
+      if (result.oneAway) {
+        audio.playOneAway()
+      } else {
+        audio.playWrongGuess()
+      }
       setShakingWords(new Set(selectedWords))
       setTimeout(() => setShakingWords(new Set()), 400)
-    }
-
-    const state = activeEngine.getState()
-    const isOver = state.gameStatus === GameStatus.WON || state.gameStatus === GameStatus.LOST
-
-    if (mode === 'daily' && isOver) {
-      const won = state.gameStatus === GameStatus.WON
-      const challengeNumber = getChallengeNumber()
-      const emojiCard = buildEmojiCard(dailyPuzzle, state.guessHistory, challengeNumber)
-      const solvedCount = state.guessHistory.filter(g => g.correct).length
-      const streak = updateStreak(won)
-
-      // Persist completed state
-      saveDailyState({
-        played: true,
-        attemptStarted: true,
-        won,
-        guessHistory: state.guessHistory,
-        livesRemaining: state.livesRemaining,
-        challengeNumber,
-      })
-
-      setDailyResult({ challengeNumber, emojiCard, solvedCount, won, streak })
+      if (newState.gameStatus === GameStatus.LOST) {
+        setTimeout(() => audio.playGameOver(), 200)
+        // Save completed (lost) daily state
+        if (mode === 'daily') {
+          const cn = getChallengeNumber()
+          const emojiCard = buildEmojiCard(dailyPuzzle, newState.guessHistory, cn)
+          const solvedCount = newState.guessHistory.filter(g => g.correct).length
+          const streak = updateStreak(false)
+          saveDailyState({
+            played: true,
+            attemptStarted: true,
+            won: false,
+            guessHistory: newState.guessHistory,
+            livesRemaining: newState.livesRemaining,
+            challengeNumber: cn,
+          })
+          setDailyResult({ challengeNumber: cn, emojiCard, solvedCount, won: false, streak })
+        }
+      }
+      setOneAway(result.oneAway)
+      setTimeout(() => setOneAway(false), 1500)
     }
   }
 
@@ -185,6 +218,7 @@ function App() {
     setDailyEngine(prev => prev) // no-op, just keep daily engine
     refreshDisplay(engine)
     setShakingWords(new Set())
+    setOneAway(false)
   }, [])
 
   // Suppress unused variable warning — practicePuzzle is used only if we later
@@ -249,6 +283,9 @@ function App() {
             onSubmit={handleSubmit}
             onShuffle={handleShuffle}
             onDeselectAll={handleDeselectAll}
+            oneAway={oneAway}
+            challengeNumber={challengeNumber}
+            audio={audio}
           />
         </>
       )}
