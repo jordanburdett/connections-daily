@@ -5,6 +5,7 @@ interface ResultCardProps {
   emojiCard: string
   solvedCount: number
   won: boolean
+  noMistakes: boolean
   streak: number
   onPlayPractice: () => void
 }
@@ -41,6 +42,7 @@ export function ResultCard({
   emojiCard,
   solvedCount,
   won,
+  noMistakes,
   streak,
   onPlayPractice,
 }: ResultCardProps) {
@@ -76,7 +78,7 @@ export function ResultCard({
     })
   }
 
-  const noMistakes = won && solvedCount === 4
+  // noMistakes is passed as a prop — computed from guessHistory.every(g => g.correct) in parent
 
   return (
     <div className="result-card" role="dialog" aria-label="Daily challenge result">

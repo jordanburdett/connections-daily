@@ -24,6 +24,7 @@ interface DailyResult {
   emojiCard: string
   solvedCount: number
   won: boolean
+  noMistakes: boolean
   streak: number
 }
 
@@ -101,12 +102,14 @@ function App() {
       const puzzle = getDailyPuzzle()
       const emojiCard = buildEmojiCard(puzzle, saved.guessHistory, saved.challengeNumber)
       const solvedCount = saved.guessHistory.filter(g => g.correct).length
+      const noMistakes = saved.guessHistory.every(g => g.correct)
       const streak = loadStreak().count
       return {
         challengeNumber: saved.challengeNumber,
         emojiCard,
         solvedCount,
         won: saved.won,
+        noMistakes,
         streak,
       }
     }
@@ -155,6 +158,7 @@ function App() {
         const cn = getChallengeNumber()
         const emojiCard = buildEmojiCard(dailyPuzzle, newState.guessHistory, cn)
         const solvedCount = newState.guessHistory.filter(g => g.correct).length
+        const noMistakes = newState.guessHistory.every(g => g.correct)
         const streak = updateStreak(won)
         saveDailyState({
           played: true,
@@ -164,7 +168,7 @@ function App() {
           livesRemaining: newState.livesRemaining,
           challengeNumber: cn,
         })
-        setDailyResult({ challengeNumber: cn, emojiCard, solvedCount, won, streak })
+        setDailyResult({ challengeNumber: cn, emojiCard, solvedCount, won, noMistakes, streak })
       }
     } else if (!result.alreadyGuessed) {
       if (result.oneAway) {
@@ -190,7 +194,7 @@ function App() {
             livesRemaining: newState.livesRemaining,
             challengeNumber: cn,
           })
-          setDailyResult({ challengeNumber: cn, emojiCard, solvedCount, won: false, streak })
+          setDailyResult({ challengeNumber: cn, emojiCard, solvedCount, won: false, noMistakes: false, streak })
         }
       }
       setOneAway(result.oneAway)
@@ -260,6 +264,7 @@ function App() {
           emojiCard={dailyResult.emojiCard}
           solvedCount={dailyResult.solvedCount}
           won={dailyResult.won}
+          noMistakes={dailyResult.noMistakes}
           streak={dailyResult.streak}
           onPlayPractice={handlePlayPractice}
         />
