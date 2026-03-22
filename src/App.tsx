@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { GameEngine } from './game/GameEngine'
 import { GameBoard } from './components/GameBoard'
 import { ResultCard } from './components/ResultCard'
+import { PuzzleForge } from './components/PuzzleForge'
 import {
   getDailyPuzzle,
   getChallengeNumber,
@@ -17,7 +18,7 @@ import type { PuzzleData, GameState } from './types'
 import { GameStatus } from './types'
 import { AudioEngine } from './utils/AudioEngine'
 
-type AppMode = 'daily' | 'practice'
+type AppMode = 'daily' | 'practice' | 'forge' | 'custom'
 
 interface DailyResult {
   challengeNumber: number
@@ -58,7 +59,10 @@ function createDailyEngine(): { engine: GameEngine; puzzle: PuzzleData } {
 
 function App() {
   const [mode, setMode] = useState<AppMode>(() => {
-    // Check if today's daily has already been played — start in daily mode always
+    // Check URL hash for a custom puzzle on initial load
+    if (typeof window !== 'undefined' && window.location.hash.startsWith('#puzzle=')) {
+      return 'custom'
+    }
     return 'daily'
   })
 
@@ -82,12 +86,48 @@ function App() {
     return PUZZLES[idx]
   })
 
+  // Custom puzzle state (Forge)
+  const [customPuzzle, setCustomPuzzle] = useState<PuzzleData | null>(() => {
+    // Attempt to load from URL hash on initial render
+    if (typeof window !== 'undefined' && window.location.hash.startsWith('#puzzle=')) {
+      try {
+        const encoded = window.location.hash.slice('#puzzle='.length)
+        const decoded = JSON.parse(atob(encoded)) as PuzzleData
+        if (decoded && Array.isArray(decoded.categories) && decoded.categories.length === 4) {
+          return decoded
+        }
+      } catch {
+        // invalid hash — ignore
+      }
+    }
+    return null
+  })
+  const [customEngine, setCustomEngine] = useState<GameEngine | null>(() => {
+    if (typeof window !== 'undefined' && window.location.hash.startsWith('#puzzle=')) {
+      try {
+        const encoded = window.location.hash.slice('#puzzle='.length)
+        const decoded = JSON.parse(atob(encoded)) as PuzzleData
+        if (decoded && Array.isArray(decoded.categories) && decoded.categories.length === 4) {
+          const engine = new GameEngine(decoded)
+          engine.shuffleTiles()
+          return engine
+        }
+      } catch {
+        // invalid hash — ignore
+      }
+    }
+    return null
+  })
+  const [customResult, setCustomResult] = useState<{ won: boolean } | null>(null)
+
   // Shared display state
   const [displayState, setDisplayState] = useState<GameState>(() => {
+    if (mode === 'custom' && customEngine) {
+      return customEngine.getState()
+    }
     // Check if daily is already completed — loadDailyState().played
     const saved = loadDailyState()
     if (saved?.played) {
-      // We'll show ResultCard, so displayState doesn't matter much
       return dailyEngine.getState()
     }
     return dailyEngine.getState()
@@ -116,7 +156,12 @@ function App() {
     return null
   })
 
-  const activeEngine = mode === 'daily' ? dailyEngine : practiceEngine
+  function getActiveEngine(): GameEngine {
+    if (mode === 'custom' && customEngine) return customEngine
+    if (mode === 'daily') return dailyEngine
+    return practiceEngine
+  }
+
   const challengeNumber = getChallengeNumber()
 
   function refreshDisplay(engine: GameEngine) {
@@ -128,23 +173,42 @@ function App() {
     if (newMode === 'daily') {
       markAttemptStarted()
       refreshDisplay(dailyEngine)
-    } else {
+    } else if (newMode === 'practice') {
       refreshDisplay(practiceEngine)
+    }
+    // Clear URL hash when leaving custom/forge
+    if (mode === 'custom' || mode === 'forge') {
+      history.pushState('', document.title, window.location.pathname + window.location.search)
     }
     setMode(newMode)
     setShakingWords(new Set())
     setOneAway(false)
   }
 
+  // Called from PuzzleForge when user clicks "Play This Puzzle"
+  function handleForgePlay(puzzle: PuzzleData) {
+    const engine = new GameEngine(puzzle)
+    engine.shuffleTiles()
+    setCustomPuzzle(puzzle)
+    setCustomEngine(engine)
+    setCustomResult(null)
+    setMode('custom')
+    setDisplayState(engine.getState())
+    setShakingWords(new Set())
+    setOneAway(false)
+  }
+
   function handleTileClick(word: string) {
-    activeEngine.toggleTile(word)
-    refreshDisplay(activeEngine)
+    const engine = getActiveEngine()
+    engine.toggleTile(word)
+    refreshDisplay(engine)
   }
 
   function handleSubmit() {
-    const selectedWords = activeEngine.getSelectedWords()
-    const result = activeEngine.submitGuess()
-    const newState = activeEngine.getState()
+    const engine = getActiveEngine()
+    const selectedWords = engine.getSelectedWords()
+    const result = engine.submitGuess()
+    const newState = engine.getState()
     setDisplayState(newState)
 
     if (result.correct) {
@@ -169,6 +233,9 @@ function App() {
           challengeNumber: cn,
         })
         setDailyResult({ challengeNumber: cn, emojiCard, solvedCount, won, noMistakes, streak })
+      }
+      if (mode === 'custom' && isOver) {
+        setCustomResult({ won: newState.gameStatus === GameStatus.WON })
       }
     } else if (!result.alreadyGuessed) {
       if (result.oneAway) {
@@ -196,6 +263,9 @@ function App() {
           })
           setDailyResult({ challengeNumber: cn, emojiCard, solvedCount, won: false, noMistakes: false, streak })
         }
+        if (mode === 'custom') {
+          setCustomResult({ won: false })
+        }
       }
       setOneAway(result.oneAway)
       setTimeout(() => setOneAway(false), 1500)
@@ -203,13 +273,15 @@ function App() {
   }
 
   function handleShuffle() {
-    activeEngine.shuffleTiles()
-    refreshDisplay(activeEngine)
+    const engine = getActiveEngine()
+    engine.shuffleTiles()
+    refreshDisplay(engine)
   }
 
   function handleDeselectAll() {
-    activeEngine.deselectAll()
-    refreshDisplay(activeEngine)
+    const engine = getActiveEngine()
+    engine.deselectAll()
+    refreshDisplay(engine)
   }
 
   const handleNewPracticePuzzle = useCallback(() => {
@@ -229,11 +301,23 @@ function App() {
   // show a practice result, but we keep it for future use.
   void practicePuzzle
 
+  function handlePlayAgainCustom() {
+    if (!customPuzzle) return
+    const engine = new GameEngine(customPuzzle)
+    engine.shuffleTiles()
+    setCustomEngine(engine)
+    setCustomResult(null)
+    setDisplayState(engine.getState())
+    setShakingWords(new Set())
+    setOneAway(false)
+  }
+
   function handlePlayPractice() {
     handleSwitchMode('practice')
   }
 
   const showDailyResult = mode === 'daily' && dailyResult !== null
+  const showCustomResult = mode === 'custom' && customResult !== null
 
   return (
     <div>
@@ -256,6 +340,13 @@ function App() {
         >
           Practice
         </button>
+        <button
+          type="button"
+          className={`mode-btn${mode === 'forge' || mode === 'custom' ? ' mode-btn--active' : ''}`}
+          onClick={() => handleSwitchMode('forge')}
+        >
+          Forge
+        </button>
       </div>
 
       {showDailyResult ? (
@@ -268,8 +359,96 @@ function App() {
           streak={dailyResult.streak}
           onPlayPractice={handlePlayPractice}
         />
+      ) : showCustomResult ? (
+        <div className="game-container" role="dialog" aria-label="Custom puzzle result">
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '32px 16px',
+            }}
+          >
+            <div
+              style={{
+                border: '2px solid #C9853A',
+                borderRadius: 8,
+                display: 'inline-block',
+                padding: '4px 14px',
+                color: '#C9853A',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                marginBottom: 20,
+                letterSpacing: '0.05em',
+              }}
+            >
+              CUSTOM PUZZLE
+            </div>
+            <h2
+              style={{
+                fontSize: '1.4rem',
+                fontWeight: 800,
+                color: '#1A1A1A',
+                marginBottom: 16,
+              }}
+            >
+              {customResult.won ? 'You solved it! \uD83C\uDF89' : 'Better luck next time!'}
+            </h2>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                alignItems: 'center',
+              }}
+            >
+              <button
+                type="button"
+                className="btn-submit"
+                onClick={handlePlayAgainCustom}
+                style={{ minWidth: 200 }}
+              >
+                Play Again
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => handleSwitchMode('daily')}
+                style={{ minWidth: 200 }}
+              >
+                Try Daily
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => handleSwitchMode('forge')}
+                style={{ minWidth: 200 }}
+              >
+                Back to Forge
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : mode === 'forge' ? (
+        <PuzzleForge onPlay={handleForgePlay} />
       ) : (
         <>
+          {mode === 'custom' && (
+            <div className="practice-header">
+              <div
+                style={{
+                  border: '2px solid #C9853A',
+                  borderRadius: 8,
+                  display: 'inline-block',
+                  padding: '4px 14px',
+                  color: '#C9853A',
+                  fontWeight: 700,
+                  fontSize: '0.85rem',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                CUSTOM PUZZLE
+              </div>
+            </div>
+          )}
           {mode === 'practice' && (
             <div className="practice-header">
               <button
