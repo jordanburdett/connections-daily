@@ -29,12 +29,12 @@ export function GameBoard({
 
   // When lost, build a list of unsolved categories from the original puzzle for reveal
   // We derive unsolved categories from unsolvedTiles — collect by categoryColor
-  const unsolvedCategoryMap = new Map<string, { color: string; words: string[] }>()
+  const unsolvedCategoryMap = new Map<string, { color: string; name: string; words: string[] }>()
   if (isLost) {
     for (const tile of tiles) {
       if (!tile.solved) {
         if (!unsolvedCategoryMap.has(tile.categoryColor)) {
-          unsolvedCategoryMap.set(tile.categoryColor, { color: tile.categoryColor, words: [] })
+          unsolvedCategoryMap.set(tile.categoryColor, { color: tile.categoryColor, name: tile.categoryName, words: [] })
         }
         unsolvedCategoryMap.get(tile.categoryColor)!.words.push(tile.word)
       }
@@ -66,7 +66,7 @@ export function GameBoard({
           {Array.from(unsolvedCategoryMap.entries()).map(([color, group]) => (
             <CategoryBanner
               key={color}
-              name={color.toUpperCase()}
+              name={group.name}
               color="grey"
               words={group.words}
             />

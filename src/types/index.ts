@@ -14,6 +14,7 @@ export interface PuzzleData {
 export interface TileState {
   word: string
   categoryColor: CategoryColor
+  categoryName: string
   solved: boolean
   selected: boolean
 }

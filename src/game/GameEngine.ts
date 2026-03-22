@@ -33,6 +33,7 @@ export class GameEngine {
         this.tiles.push({
           word,
           categoryColor: category.color,
+          categoryName: category.name,
           solved: false,
           selected: false,
         })
