@@ -123,7 +123,6 @@ export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
   const errors = validateCategories(categories)
   const isValid = errors.length === 0
   const filledWords = countFilledWords(categories)
-  const hasAnyContent = filledWords > 0 || categories.some(c => c.name.trim() !== '')
 
   function updateCategoryName(index: number, value: string) {
     setCategories(prev => {
@@ -165,15 +164,15 @@ export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
   function handlePlay() {
     if (!isValid) return
     const puzzle = buildPuzzleData(categories)
-    const encoded = btoa(JSON.stringify(puzzle))
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(puzzle))))
     window.location.hash = `puzzle=${encoded}`
     onPlay(puzzle)
   }
 
   function handleCopyLink() {
-    if (!hasAnyContent) return
+    if (!isValid) return
     const puzzle = buildPuzzleData(categories)
-    const encoded = btoa(JSON.stringify(puzzle))
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(puzzle))))
     const url = `${window.location.origin}${window.location.pathname}#puzzle=${encoded}`
 
     navigator.clipboard.writeText(url).then(() => {
@@ -345,7 +344,7 @@ export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
           type="button"
           className="btn-secondary"
           onClick={handleCopyLink}
-          disabled={!hasAnyContent}
+          disabled={!isValid}
           style={{ minWidth: 160 }}
         >
           {copied ? 'Copied! \u2713' : 'Copy Share Link'}

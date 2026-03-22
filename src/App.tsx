@@ -91,8 +91,8 @@ function App() {
     // Attempt to load from URL hash on initial render
     if (typeof window !== 'undefined' && window.location.hash.startsWith('#puzzle=')) {
       try {
-        const encoded = window.location.hash.slice('#puzzle='.length)
-        const decoded = JSON.parse(atob(encoded)) as PuzzleData
+        const fragment = window.location.hash.slice('#puzzle='.length)
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(fragment)))) as PuzzleData
         if (decoded && Array.isArray(decoded.categories) && decoded.categories.length === 4) {
           return decoded
         }
@@ -105,8 +105,8 @@ function App() {
   const [customEngine, setCustomEngine] = useState<GameEngine | null>(() => {
     if (typeof window !== 'undefined' && window.location.hash.startsWith('#puzzle=')) {
       try {
-        const encoded = window.location.hash.slice('#puzzle='.length)
-        const decoded = JSON.parse(atob(encoded)) as PuzzleData
+        const fragment = window.location.hash.slice('#puzzle='.length)
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(fragment)))) as PuzzleData
         if (decoded && Array.isArray(decoded.categories) && decoded.categories.length === 4) {
           const engine = new GameEngine(decoded)
           engine.shuffleTiles()
@@ -468,7 +468,7 @@ function App() {
             onShuffle={handleShuffle}
             onDeselectAll={handleDeselectAll}
             oneAway={oneAway}
-            challengeNumber={challengeNumber}
+            challengeNumber={mode === 'custom' ? undefined : challengeNumber}
             audio={audio}
           />
         </>

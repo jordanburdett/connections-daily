@@ -14,7 +14,7 @@ interface GameBoardProps {
   onShuffle: () => void
   onDeselectAll: () => void
   oneAway: boolean
-  challengeNumber: number
+  challengeNumber?: number
   audio: AudioEngine
 }
 
@@ -122,7 +122,7 @@ export function GameBoard({
         <span className="diff-dot diff-dot--green" aria-label="green" />
         <span className="diff-dot diff-dot--blue" aria-label="blue" />
         <span className="diff-dot diff-dot--purple" aria-label="purple" />
-        <span>#{challengeNumber}</span>
+        {challengeNumber !== undefined && <span>#{challengeNumber}</span>}
       </div>
 
       {/* Action buttons */}
