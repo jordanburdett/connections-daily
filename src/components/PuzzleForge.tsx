@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import type { PuzzleData, CategoryColor } from '../types'
 import { PUZZLES } from '../data/puzzles'
 
@@ -110,6 +110,12 @@ function countFilledWords(categories: CategoryDraft[]): number {
   return count
 }
 
+// Total inputs per category: 1 name + 4 words = 5
+// Total refs: 4 categories × 5 = 20
+// Layout: [cat0_name, cat0_w0, cat0_w1, cat0_w2, cat0_w3, cat1_name, ...]
+const INPUTS_PER_CAT = 5
+const TOTAL_INPUTS = 4 * INPUTS_PER_CAT // 20
+
 export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
   const [categories, setCategories] = useState<CategoryDraft[]>([
     emptyCategory(0),
@@ -118,11 +124,51 @@ export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
     emptyCategory(3),
   ])
   const [copied, setCopied] = useState(false)
+  const [emptyWarning, setEmptyWarning] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const emptyWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Flat array of refs: index = catIndex * 5 + inputIndex (0=name, 1-4=words)
+  const inputRefs = useRef<Array<HTMLInputElement | null>>(
+    Array.from({ length: TOTAL_INPUTS }, () => null)
+  )
+
+  const setInputRef = useCallback(
+    (catIndex: number, inputIndex: number) =>
+      (el: HTMLInputElement | null) => {
+        inputRefs.current[catIndex * INPUTS_PER_CAT + inputIndex] = el
+      },
+    []
+  )
+
+  function focusNext(catIndex: number, inputIndex: number) {
+    const current = catIndex * INPUTS_PER_CAT + inputIndex
+    const next = (current + 1) % TOTAL_INPUTS
+    inputRefs.current[next]?.focus()
+  }
+
+  function handleInputKeyDown(
+    e: React.KeyboardEvent<HTMLInputElement>,
+    catIndex: number,
+    inputIndex: number
+  ) {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      focusNext(catIndex, inputIndex)
+    }
+  }
 
   const errors = validateCategories(categories)
   const isValid = errors.length === 0
   const filledWords = countFilledWords(categories)
+
+  function isCompletelyEmpty(): boolean {
+    return categories.every(
+      cat =>
+        cat.name.trim() === '' &&
+        cat.words.every(w => w.trim() === '')
+    )
+  }
 
   function updateCategoryName(index: number, value: string) {
     setCategories(prev => {
@@ -162,6 +208,12 @@ export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
   }
 
   function handlePlay() {
+    if (isCompletelyEmpty()) {
+      setEmptyWarning(true)
+      if (emptyWarningTimerRef.current !== null) clearTimeout(emptyWarningTimerRef.current)
+      emptyWarningTimerRef.current = setTimeout(() => setEmptyWarning(false), 4000)
+      return
+    }
     if (!isValid) return
     const puzzle = buildPuzzleData(categories)
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(puzzle))))
@@ -200,6 +252,15 @@ export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
       aria-label="Puzzle Forge — create a custom puzzle"
       style={{ paddingBottom: 32 }}
     >
+      <style>{`
+        @media (max-width: 479px) {
+          .forge-word-grid { grid-template-columns: 1fr 1fr !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .forge-empty-warning { animation: none !important; transition: none !important; }
+        }
+      `}</style>
+
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
         <button
           type="button"
@@ -224,9 +285,11 @@ export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
         >
           {/* Category name input */}
           <input
+            ref={setInputRef(catIndex, 0)}
             type="text"
             value={cat.name}
             onChange={e => updateCategoryName(catIndex, e.target.value)}
+            onKeyDown={e => handleInputKeyDown(e, catIndex, 0)}
             placeholder="Category name..."
             maxLength={40}
             aria-label={`Category ${catIndex + 1} name`}
@@ -272,14 +335,19 @@ export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
             ))}
           </div>
 
-          {/* Word inputs in 2x2 grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          {/* Word inputs — single column by default, 2x2 grid on mobile <480px */}
+          <div
+            className="forge-word-grid"
+            style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6 }}
+          >
             {cat.words.map((word, wordIndex) => (
               <input
                 key={wordIndex}
+                ref={setInputRef(catIndex, wordIndex + 1)}
                 type="text"
                 value={word}
                 onChange={e => updateWord(catIndex, wordIndex, e.target.value)}
+                onKeyDown={e => handleInputKeyDown(e, catIndex, wordIndex + 1)}
                 placeholder={`Word ${wordIndex + 1}`}
                 maxLength={20}
                 aria-label={`Category ${catIndex + 1} word ${wordIndex + 1}`}
@@ -313,8 +381,29 @@ export function PuzzleForge({ onPlay }: PuzzleForgeProps) {
         {filledWords} / 16 words filled
       </p>
 
-      {/* Validation errors */}
-      {errors.length > 0 && (
+      {/* Empty form warning */}
+      {emptyWarning && (
+        <p
+          className="forge-empty-warning"
+          role="alert"
+          aria-live="assertive"
+          style={{
+            color: '#92400E',
+            background: '#FEF3C7',
+            border: '1px solid #F59E0B',
+            borderRadius: 6,
+            fontSize: '0.85rem',
+            textAlign: 'center',
+            padding: '8px 12px',
+            marginBottom: 12,
+          }}
+        >
+          Fill in all 16 words and 4 category names to create your puzzle.
+        </p>
+      )}
+
+      {/* Validation errors (shown only when partially filled but invalid) */}
+      {!emptyWarning && errors.length > 0 && (
         <p
           style={{
             color: '#DC2626',

@@ -445,7 +445,7 @@ function App() {
                   letterSpacing: '0.05em',
                 }}
               >
-                CUSTOM PUZZLE
+                ✏️ Custom Puzzle
               </div>
             </div>
           )}
@@ -460,17 +460,25 @@ function App() {
               </button>
             </div>
           )}
-          <GameBoard
-            displayState={displayState}
-            shakingWords={shakingWords}
-            onTileClick={handleTileClick}
-            onSubmit={handleSubmit}
-            onShuffle={handleShuffle}
-            onDeselectAll={handleDeselectAll}
-            oneAway={oneAway}
-            challengeNumber={mode === 'custom' ? undefined : challengeNumber}
-            audio={audio}
-          />
+          <div
+            style={
+              mode === 'custom'
+                ? { border: '2px solid #C9853A', borderRadius: 12 }
+                : undefined
+            }
+          >
+            <GameBoard
+              displayState={displayState}
+              shakingWords={shakingWords}
+              onTileClick={handleTileClick}
+              onSubmit={handleSubmit}
+              onShuffle={handleShuffle}
+              onDeselectAll={handleDeselectAll}
+              oneAway={oneAway}
+              challengeNumber={mode === 'custom' ? undefined : challengeNumber}
+              audio={audio}
+            />
+          </div>
         </>
       )}
     </div>
