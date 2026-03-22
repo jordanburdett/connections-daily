@@ -42,9 +42,11 @@ function createDailyEngine(): { engine: GameEngine; puzzle: PuzzleData } {
   const saved = loadDailyState()
   if (saved && saved.guessHistory.length > 0 && !saved.played) {
     for (const record of saved.guessHistory) {
+      engine.deselectAll()
       record.words.forEach(w => engine.toggleTile(w))
       engine.submitGuess()
     }
+    engine.deselectAll()
   } else {
     engine.shuffleTiles()
   }
