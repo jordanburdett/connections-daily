@@ -1,0 +1,40 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #FAF7F2; font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; }
+.game-container { max-width: 480px; margin: 0 auto; padding: 16px; }
+.tile-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.tile {
+  background: #EDE8E0; border: 1px solid #E5E0D8; border-radius: 8px;
+  min-height: 52px; font-weight: 700; font-size: clamp(0.8rem, 2vw, 1rem);
+  cursor: pointer; user-select: none; transition: background-color 120ms;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 6px 4px; color: #1A1A1A;
+}
+.tile--selected { background: #2A6DB5; color: #FFFFFF; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+.tile--shake { animation: shake 400ms ease-in-out; }
+@keyframes tile-pop { 0%{transform:scale(1)} 50%{transform:scale(1.08)} 100%{transform:scale(1)} }
+.tile--pop { animation: tile-pop 300ms ease-out; }
+.banner { border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
+.banner--yellow { background: #F9DF74; color: #3D3000; }
+.banner--green { background: #6ABF69; color: #1A3A1A; }
+.banner--blue { background: #5B8AD4; color: #0D1F42; }
+.banner--purple { background: #A855F7; color: #FFFFFF; }
+.banner-name { font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.9rem; }
+.banner-words { font-size: 0.8rem; margin-top: 4px; opacity: 0.85; }
+.life-dots { display: flex; gap: 8px; justify-content: center; margin: 12px 0; }
+.life-dot { width: 14px; height: 14px; border-radius: 50%; }
+.life-dot--active { background: #2A6DB5; }
+.life-dot--lost { background: #D1D5DB; }
+.game-buttons { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+.btn-submit { background: #1A1A1A; color: #FFFFFF; border: none; border-radius: 6px; height: 48px; min-width: 120px; font-weight: 700; font-size: 1rem; cursor: pointer; font-family: inherit; }
+.btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-secondary { background: transparent; border: 2px solid #1A1A1A; border-radius: 6px; height: 44px; padding: 0 16px; font-weight: 600; font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+.win-overlay { text-align: center; padding: 24px; font-size: 1.4rem; font-weight: 700; color: #1A1A1A; }
+.banner--grey { background: #E5E0D8; color: #9CA3AF; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile--shake { animation: none; transition: none; }
+  .tile--pop { animation: none; transition: none; }
+  .tile { transition: none; }
+}
